@@ -1,42 +1,30 @@
 import os
 import re
 import html
-import nltk
-import time
-nltk.download('punkt_tab')
-from nltk.tokenize import word_tokenize
 
 
+def ReadData(DATA):
+    for filename in sorted(os.listdir(DATA)):
+        if not filename.endswith('.sgm'):
+            continue
 
-''' we'll be iterationg through all the files in the DATA directory, and extracting the relevant information from each article 
-     we'll be using regular expressions to extract the information we need, and then we'll be storing it in a dictionary for later use.'''      
-def ReadData(DATA): 
-    for filename in os.listdir(DATA):
         full_path = os.path.join(DATA, filename)
 
         with open(full_path, 'r', encoding='latin-1') as f:
             content = f.read()
-        
-        articles = re.findall(r'<REUTERS.*?</REUTERS>', content, re.DOTALL)
+
+        articles = re.findall(r'<REUTERS\b.*?</REUTERS>', content, re.DOTALL)
         for article in articles:
-            newidMatch = re.search(r'NEWID="(\d+)"', article)
-            if newidMatch:
-                newid = newidMatch.group(1).strip()
-            else: 
-                newid = None
+            newid_match = re.search(
+                r'<REUTERS\b[^>]*\bNEWID="(\d+)"', article
+            )
+            if not newid_match:
+                raise ValueError(f"Reuters article in {filename} has no NEWID")
+            newid = int(newid_match.group(1))
 
-            titleMatch = re.search(r'<TITLE>(.*?)</TITLE>', article, re.DOTALL)
-            if titleMatch:
-                title = titleMatch.group(1).strip()
-                title = html.unescape(title)
-            else: 
-                title = ''
+            title_match = re.search(r'<TITLE>(.*?)</TITLE>', article, re.DOTALL)
+            title = html.unescape(title_match.group(1).strip()) if title_match else ''
 
-            bodyMatch = re.search(r'<BODY>(.*?)</BODY>', article, re.DOTALL)
-            if bodyMatch:
-                body = bodyMatch.group(1).strip()
-                body = html.unescape(body)
-            else:
-                body = ''
+            body_match = re.search(r'<BODY>(.*?)</BODY>', article, re.DOTALL)
+            body = html.unescape(body_match.group(1).strip()) if body_match else ''
             yield (newid, title + ' ' + body)
-
