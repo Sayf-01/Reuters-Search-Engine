@@ -6,15 +6,13 @@ from tokenizer import tokenize
 
 
 def _ranked_terms(folder):
-    frequencies = Counter()
+    freq = Counter()
     for _, text in ReadData(folder):
-        frequencies.update(
-            tokenize(text, remove_numbers=True, case_fold=True)
-        )
+        freq.update(tokenize(text, remove_numbers=True, case_fold=True))
 
     return sorted(
-        frequencies,
-        key=lambda term: (-frequencies[term], term),
+        freq,
+        key=lambda term: (-freq[term], term),
     )
 
 
@@ -25,15 +23,13 @@ def most_frequent_terms(folder, count):
 
 
 def _percentage_change(value, reference):
-    if not reference:
-        return 0.0
-    return (value / reference - 1) * 100
+    return (value / reference - 1) * 100 if reference else 0.0
 
 
 def compression_variants(folder):
-    ranked_terms = _ranked_terms(folder)
-    stop_30 = set(ranked_terms[:30])
-    stop_150 = set(ranked_terms[:150])
+    ranked = _ranked_terms(folder)
+    stop_30 = set(ranked[:30])
+    stop_150 = set(ranked[:150])
 
     return [
         ("unfiltered", {}),
@@ -73,61 +69,53 @@ def compression_variants(folder):
 def build_compression_table(folder):
     variants = compression_variants(folder)
     rows = []
-    unfiltered_terms = None
-    unfiltered_postings = None
-    case_fold_terms = None
-    case_fold_postings = None
-    previous_terms = None
-    previous_postings = None
+    all_terms = all_posts = None
+    folded_terms = folded_posts = None
+    prev_terms = prev_posts = None
 
-    for name, tokenizer_options in variants:
-        index = build_spimi_index(folder, tokenizer_options=tokenizer_options)
-        term_count = len(index)
-        posting_count = sum(len(postings) for postings in index.values())
+    for variant, options in variants:
+        idx = build_spimi_index(folder, tokenizer_options=options)
+        terms = len(idx)
+        posts = sum(map(len, idx.values()))
 
-        if name == "unfiltered":
-            unfiltered_terms = term_count
-            unfiltered_postings = posting_count
-        if name == "case folding":
-            case_fold_terms = term_count
-            case_fold_postings = posting_count
+        if variant == "unfiltered":
+            all_terms, all_posts = terms, posts
+        if variant == "case folding":
+            folded_terms, folded_posts = terms, posts
 
-        if name in ("30 stop words", "150 stop words"):
-            reference_terms = case_fold_terms
-            reference_postings = case_fold_postings
+        if variant in ("30 stop words", "150 stop words"):
+            ref_terms, ref_posts = folded_terms, folded_posts
         else:
-            reference_terms = previous_terms
-            reference_postings = previous_postings
+            ref_terms, ref_posts = prev_terms, prev_posts
 
         rows.append(
             {
-                "variant": name,
-                "terms": term_count,
+                "variant": variant,
+                "terms": terms,
                 "term_delta_pct": (
                     None
-                    if name == "unfiltered" or reference_terms is None
-                    else _percentage_change(term_count, reference_terms)
+                    if variant == "unfiltered" or ref_terms is None
+                    else _percentage_change(terms, ref_terms)
                 ),
                 "term_total_pct": (
                     None
-                    if name == "unfiltered" or unfiltered_terms is None
-                    else _percentage_change(term_count, unfiltered_terms)
+                    if variant == "unfiltered" or all_terms is None
+                    else _percentage_change(terms, all_terms)
                 ),
-                "postings": posting_count,
+                "postings": posts,
                 "posting_delta_pct": (
                     None
-                    if name == "unfiltered" or reference_postings is None
-                    else _percentage_change(posting_count, reference_postings)
+                    if variant == "unfiltered" or ref_posts is None
+                    else _percentage_change(posts, ref_posts)
                 ),
                 "posting_total_pct": (
                     None
-                    if name == "unfiltered" or unfiltered_postings is None
-                    else _percentage_change(posting_count, unfiltered_postings)
+                    if variant == "unfiltered" or all_posts is None
+                    else _percentage_change(posts, all_posts)
                 ),
             }
         )
 
-        previous_terms = term_count
-        previous_postings = posting_count
+        prev_terms, prev_posts = terms, posts
 
     return rows

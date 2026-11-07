@@ -19,23 +19,22 @@ def benchmark_indexers(folder, *, pair_limit=10_000, repeats=7):
             f"Expected {pair_limit} pairs, but corpus produced {len(pairs)}"
         )
 
-    naive_times = []
-    spimi_times = []
-    for iteration in range(repeats):
+    naive = []
+    spimi = []
+    for run in range(repeats):
         builders = (
-            ("naive", naive_times, lambda: build_index(sort_and_dedupe(pairs))),
-            ("spimi", spimi_times, lambda: build_spimi_index_from_pairs(pairs)),
+            ("naive", naive, lambda: build_index(sort_and_dedupe(pairs))),
+            ("spimi", spimi, lambda: build_spimi_index_from_pairs(pairs)),
         )
-        if iteration % 2:
-            builders = tuple(reversed(builders))
+        builders = tuple(reversed(builders)) if run % 2 else builders
 
-        indexes = {}
+        idx = {}
         for name, samples, builder in builders:
-            start = time.perf_counter()
-            indexes[name] = builder()
-            samples.append(time.perf_counter() - start)
+            started = time.perf_counter()
+            idx[name] = builder()
+            samples.append(time.perf_counter() - started)
 
-        if indexes["naive"] != indexes["spimi"]:
+        if idx["naive"] != idx["spimi"]:
             raise AssertionError("Naive and SPIMI indexes differ")
 
     return {
@@ -43,21 +42,23 @@ def benchmark_indexers(folder, *, pair_limit=10_000, repeats=7):
         "unique_pair_count": len(sort_and_dedupe(pairs)),
         "repeats": repeats,
         "statistic": "median",
-        "naive_seconds": statistics.median(naive_times),
-        "spimi_seconds": statistics.median(spimi_times),
-        "naive_samples": naive_times,
-        "spimi_samples": spimi_times,
+        "naive_seconds": statistics.median(naive),
+        "spimi_seconds": statistics.median(spimi),
+        "naive_samples": naive,
+        "spimi_samples": spimi,
     }
 
 
 if __name__ == "__main__":
     data_dir = Path(__file__).resolve().parent / "DATA"
-    result = benchmark_indexers(data_dir)
+    res = benchmark_indexers(data_dir)
     print(
-        f"Built {result['pair_count']} identical term-document pairs "
-        f"({result['unique_pair_count']} unique) over {result['repeats']} runs."
+        f"Built {res['pair_count']} identical term-document pairs "
+        f"({res['unique_pair_count']} unique) over {res['repeats']} runs."
     )
-    print(f"Median naive index-build time: {result['naive_seconds']:.6f} s")
-    print(f"Median SPIMI index-build time: {result['spimi_seconds']:.6f} s")
-    print("SPIMI/naive median ratio: "
-          f"{result['spimi_seconds'] / result['naive_seconds']:.3f}x")
+    print(f"Median naive index-build time: {res['naive_seconds']:.6f} s")
+    print(f"Median SPIMI index-build time: {res['spimi_seconds']:.6f} s")
+    print(
+        "SPIMI/naive median ratio: "
+        f"{res['spimi_seconds'] / res['naive_seconds']:.3f}x"
+    )

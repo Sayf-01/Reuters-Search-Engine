@@ -3,25 +3,26 @@ from tokenizer import tokenize
 
 
 def build_spimi_index_from_pairs(pairs):
-    index = {}
-    previous_docid = 0
+    idx = {}
+    prev_doc = 0
 
-    for term, docid in pairs:
-        if docid < previous_docid:
+    for term, doc_id in pairs:
+        if doc_id < prev_doc:
             raise ValueError("SPIMI requires pairs in increasing NEWID order")
-        previous_docid = docid
+        prev_doc = doc_id
 
-        postings = index.setdefault(term, [])
-        if not postings or postings[-1] != docid:
-            postings.append(docid)
+        docs = idx.setdefault(term, [])
+        if not docs or docs[-1] != doc_id:
+            docs.append(doc_id)
 
-    return index
+    return idx
 
 
 def build_spimi_index(folder, *, tokenizer_options=None):
-    def iter_pairs():
-        for docid, text in ReadData(folder):
+    def document_pairs():
+        for doc_id, text in ReadData(folder):
             for term in tokenize(text, **(tokenizer_options or {})):
-                yield term, docid
+                yield term, doc_id
 
-    return build_spimi_index_from_pairs(iter_pairs())
+
+    return build_spimi_index_from_pairs(document_pairs())

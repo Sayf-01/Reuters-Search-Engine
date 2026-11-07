@@ -1,56 +1,55 @@
 from tokenizer import tokenize
 
 
-def _query_terms(query, tokenizer_options):
-    original_terms = tokenize(query)
-    if not original_terms:
+def _query_terms(query_text, tokenizer_options):
+    raw = tokenize(query_text)
+    if not raw:
         raise ValueError("Query must contain at least one alphanumeric term")
-    terms = tokenize(query, **tokenizer_options)
-    return original_terms, terms
+    cooked = tokenize(query_text, **tokenizer_options)
+    return raw, cooked
 
 
 def single_term_query(index, query, *, tokenizer_options=None):
-    options = tokenizer_options or {}
-    original_terms, terms = _query_terms(query, options)
-    if len(original_terms) != 1:
+    opts = tokenizer_options or {}
+    raw, cooked = _query_terms(query, opts)
+    if len(raw) != 1:
         raise ValueError("Single-term query must contain exactly one term")
-    if not terms:
-        return []
-    return index.get(terms[0], [])
+    return [] if not cooked else index.get(cooked[0], [])
 
 
 def intersect_postings(left, right):
-    intersection = []
-    left_pos = 0
-    right_pos = 0
+    res = []
+    i = j = 0
 
-    while left_pos < len(left) and right_pos < len(right):
-        if left[left_pos] == right[right_pos]:
-            intersection.append(left[left_pos])
-            left_pos += 1
-            right_pos += 1
-        elif left[left_pos] < right[right_pos]:
-            left_pos += 1
+    while i < len(left) and j < len(right):
+        if left[i] == right[j]:
+            res.append(left[i])
+            i += 1
+            j += 1
+        elif left[i] < right[j]:
+            i += 1
         else:
-            right_pos += 1
+            j += 1
 
-    return intersection
+    return res
 
 
 def and_query(index, query, *, tokenizer_options=None):
-    original_terms, terms = _query_terms(query, tokenizer_options or {})
-    if len(terms) != len(original_terms):
+    raw, cooked = _query_terms(
+        query, tokenizer_options or {}
+    )
+    if len(cooked) != len(raw):
         return []
-    postings_lists = [index.get(term, []) for term in terms]
-    postings_lists.sort(key=len)
+    docs = [index.get(term, []) for term in cooked]
+    docs.sort(key=len)
 
-    if not postings_lists[0]:
+    if not docs[0]:
         return []
 
-    result = postings_lists[0]
-    for postings in postings_lists[1:]:
-        result = intersect_postings(result, postings)
-        if not result:
+    res = docs[0]
+    for postings in docs[1:]:
+        res = intersect_postings(res, postings)
+        if not res:
             break
 
-    return result
+    return res

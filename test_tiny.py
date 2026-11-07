@@ -1,9 +1,9 @@
-import unittest
 import random
+import unittest
 from pathlib import Path
 
-from compress import build_compression_table, most_frequent_terms
 from bench import benchmark_indexers
+from compress import build_compression_table, most_frequent_terms
 from naive_indexer import build_index, sort_and_dedupe
 from pairs import build_pairs
 from query import and_query, intersect_postings, single_term_query
@@ -24,17 +24,20 @@ class NaiveIndexerTests(unittest.TestCase):
     def test_pairs_use_numeric_document_ids(self):
         pairs = build_pairs(TINY_DATA)
         self.assertTrue(pairs)
-        self.assertEqual({docid for _, docid in pairs}, {1, 2})
-        self.assertTrue(all(isinstance(docid, int) for _, docid in pairs))
+        docs = {doc_id for _, doc_id in pairs}
+        self.assertEqual(docs, {1, 2})
+        self.assertTrue(
+            all(isinstance(doc_id, int) for doc_id in docs)
+        )
 
     def test_sort_dedupe_and_build_index(self):
         pairs = build_pairs(TINY_DATA)
         sorted_pairs = sort_and_dedupe(pairs)
-        index = build_index(sorted_pairs)
+        idx = build_index(sorted_pairs)
 
         self.assertEqual(sorted_pairs, sorted(set(pairs)))
         self.assertEqual(
-            index,
+            idx,
             {
                 "Cat": [1],
                 "Dog": [2],
@@ -48,15 +51,15 @@ class NaiveIndexerTests(unittest.TestCase):
                 "the": [1, 2],
             },
         )
-        for postings in index.values():
+        for postings in idx.values():
             self.assertEqual(postings, sorted(set(postings)))
 
     def test_spimi_matches_naive_index(self):
         pairs = build_pairs(TINY_DATA)
-        naive_index = build_index(sort_and_dedupe(pairs))
-        spimi_index = build_spimi_index(TINY_DATA)
+        naive = build_index(sort_and_dedupe(pairs))
+        spimi = build_spimi_index(TINY_DATA)
 
-        self.assertEqual(spimi_index, naive_index)
+        self.assertEqual(spimi, naive)
 
     def test_spimi_from_pairs_matches_naive_and_rejects_unsorted_input(self):
         pairs = build_pairs(TINY_DATA)
@@ -81,8 +84,16 @@ class NaiveIndexerTests(unittest.TestCase):
     def test_intersection_matches_set_reference(self):
         rng = random.Random(479)
         for _ in range(100):
-            left = sorted(rng.sample(range(100), rng.randrange(101)))
-            right = sorted(rng.sample(range(100), rng.randrange(101)))
+            left = sorted(
+                rng.sample(
+                    range(100), rng.randrange(101)
+                )
+            )
+            right = sorted(
+                rng.sample(
+                    range(100), rng.randrange(101)
+                )
+            )
             self.assertEqual(
                 intersect_postings(left, right),
                 sorted(set(left) & set(right)),
@@ -133,37 +144,37 @@ class NaiveIndexerTests(unittest.TestCase):
         )
 
     def test_benchmark_uses_requested_pair_count_and_checks_equality(self):
-        result = benchmark_indexers(TINY_DATA, pair_limit=5, repeats=2)
+        res = benchmark_indexers(TINY_DATA, pair_limit=5, repeats=2)
 
-        self.assertEqual(result["pair_count"], 5)
+        self.assertEqual(res["pair_count"], 5)
         self.assertEqual(
-            result["unique_pair_count"],
+            res["unique_pair_count"],
             len(set(build_pairs(TINY_DATA)[:5])),
         )
-        self.assertEqual(result["repeats"], 2)
-        self.assertGreaterEqual(result["naive_seconds"], 0)
-        self.assertGreaterEqual(result["spimi_seconds"], 0)
+        self.assertEqual(res["repeats"], 2)
+        self.assertGreaterEqual(res["naive_seconds"], 0)
+        self.assertGreaterEqual(res["spimi_seconds"], 0)
 
     def test_filtered_query_terms_do_not_weaken_and_query(self):
-        options = {"case_fold": True, "stopwords": {"the"}}
-        filtered_index = build_spimi_index(
+        opts = {"case_fold": True, "stopwords": {"the"}}
+        idx = build_spimi_index(
             TINY_DATA,
-            tokenizer_options=options,
+            tokenizer_options=opts,
         )
 
         self.assertEqual(
             single_term_query(
-                filtered_index,
+                idx,
                 "the",
-                tokenizer_options=options,
+                tokenizer_options=opts,
             ),
             [],
         )
         self.assertEqual(
             and_query(
-                filtered_index,
+                idx,
                 "the cat",
-                tokenizer_options=options,
+                tokenizer_options=opts,
             ),
             [],
         )

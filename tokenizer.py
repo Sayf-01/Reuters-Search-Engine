@@ -20,15 +20,18 @@ def tokenize(
     stopwords=None,
     stemming=False,
 ):
-    tokens = TOKEN_PATTERN.findall(text)
+    data = TOKEN_PATTERN.findall(text)
 
     if remove_numbers:
-        tokens = [token for token in tokens if not token.isdigit()]
-    if case_fold:
-        tokens = [token.lower() for token in tokens]
-    if stopwords is not None:
-        tokens = [token for token in tokens if token not in stopwords]
-    if stemming:
-        tokens = [_stem_token(token) for token in tokens]
+        data = [word for word in data if not word.isdigit()]
 
-    return tokens
+    if case_fold:
+        data = [word.lower() for word in data]
+
+    if stopwords is not None:
+        data = [word for word in data if word not in stopwords]
+
+    if stemming:
+        data = [_stem_token(word) for word in data]
+
+    return data
